@@ -11,10 +11,10 @@ from concurrent.futures import ThreadPoolExecutor
 from tqdm import tqdm
 
 # 加载Excel文件
-file_path = '/Users/bigyang/myapp/yiheyuan/excel/source.xls'  # 替换为实际的Excel文件路径
+file_path = '/home/bigyang/python_bigyang/yiheyuan/excel/source.xls'  # 替换为实际的Excel文件路径
 
 # 创建保存JSON文件的目录（如果不存在则创建）
-output_dir = '/Users/bigyang/myapp/yiheyuan/json/'
+output_dir = '/home/bigyang/python_bigyang/yiheyuan/json/'
 os.makedirs(output_dir, exist_ok=True)
 
 # 函数：清理文件名中的非法字符和不可见字符
