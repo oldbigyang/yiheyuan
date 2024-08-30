@@ -1,0 +1,28 @@
+#!/usr/bin/env python
+# encoding: utf-8
+
+import json
+from docx import Document
+
+# 读取 JSON 文件
+with open('/Users/bigyang/myapp/yiheyuan/json/a001.json', 'r', encoding='utf-8') as f:
+    data = json.load(f)
+
+# 打开一个 Word 文档
+doc = Document('/Users/bigyang/myapp/yiheyuan/word/temp.docx')
+
+# 定义一个字典，将占位符映射到 JSON 数据字段
+placeholder_mapping = {
+    "[year]": data.get("年"),
+    "[month]": data.get("月"),
+    "[day]": data.get("日"),
+}
+
+# 遍历文档的每一个段落，查找并替换占位符
+for paragraph in doc.paragraphs:
+    for placeholder, value in placeholder_mapping.items():
+        if placeholder in paragraph.text:
+            paragraph.text = paragraph.text.replace(placeholder, str(value))
+
+# 保存修改后的文档
+doc.save('output.docx')
