@@ -4,7 +4,6 @@
 import wx
 import os
 import json
-from threading import Thread
 from docx import Document
 import traceback
 
@@ -13,6 +12,9 @@ class MyFrame(wx.Frame):
         super(MyFrame, self).__init__(*args, **kw)
         self.InitUI()
 
+        # 绑定窗口关闭事件
+        self.Bind(wx.EVT_CLOSE, self.OnClose)
+
     def InitUI(self):
         panel = wx.Panel(self)
         vbox = wx.BoxSizer(wx.VERTICAL)
@@ -20,7 +22,7 @@ class MyFrame(wx.Frame):
         self.label1 = wx.StaticText(panel, label="请选择 JSON 数据文件的位置：")
         vbox.Add(self.label1, flag=wx.ALL, border=10)
 
-        self.dirPicker = wx.DirPickerCtrl(panel, path="/home/bigyang/python_bigyang/yiheyuan/json", message="点我选择")
+        self.dirPicker = wx.DirPickerCtrl(panel, path="/Users/bigyang/myapp/yiheyuan/json", message="点我选择")
         vbox.Add(self.dirPicker, flag=wx.EXPAND|wx.ALL, border=10)
 
         self.startBtn = wx.Button(panel, label="点击开始生成")
@@ -42,10 +44,9 @@ class MyFrame(wx.Frame):
             wx.MessageBox("所选文件夹中没有JSON文件", "错误", wx.OK | wx.ICON_ERROR)
             return
 
-        self.output_dir = "/home/bigyang/python_bigyang/yiheyuan/ok/"
+        self.output_dir = "/Users/bigyang/myapp/yiheyuan/ok/"
         os.makedirs(self.output_dir, exist_ok=True)
 
-        # 创建并显示进度条对话框
         self.progress_dialog = wx.ProgressDialog(
             "文件处理进度",
             "正在处理 JSON 文件...",
@@ -54,29 +55,18 @@ class MyFrame(wx.Frame):
             style=wx.PD_AUTO_HIDE | wx.PD_ELAPSED_TIME
         )
 
-        # 创建并启动线程来处理文件
-        self.thread = Thread(target=self.ProcessFiles, args=(json_dir, json_files))
-        self.thread.start()
-
-    def ProcessFiles(self, json_dir, json_files):
-        try:
-            # 在后台线程中处理文件
-            for i, json_file in enumerate(json_files):
+        batch_size = 5  # 每次处理的文件数量
+        for start in range(0, total_files, batch_size):
+            end = min(start + batch_size, total_files)
+            for json_file in json_files[start:end]:
                 self.process_json(json_dir, json_file)
-                # 更新进度
-                wx.CallAfter(self.UpdateProgress, i + 1, len(json_files))
+            self.UpdateProgress(end, total_files)
 
-            # 处理完成后，显示完成对话框
-            wx.CallAfter(self.OnFinish)
-        except Exception as e:
-            # 捕获所有异常并记录日志
-            error_msg = f"处理文件时出错: {str(e)}\n{traceback.format_exc()}"
-            print(error_msg)  # 可以替换为将错误写入日志文件
-            wx.CallAfter(wx.MessageBox, error_msg, "错误", wx.OK | wx.ICON_ERROR)
+        self.OnFinish()
 
     def process_json(self, json_dir, json_file):
         try:
-            template_path = "/home/bigyang/python_bigyang/yiheyuan/word/temp.docx"
+            template_path = "/Users/bigyang/myapp/yiheyuan/word/temp.docx"
             doc = Document(template_path)
 
             json_path = os.path.join(json_dir, json_file)
@@ -91,6 +81,7 @@ class MyFrame(wx.Frame):
                 "注销凭证号": "zhuxiaopingzhenghao", "级别": "jibie", "备注": "beizhu"
             }
 
+            # 更新段落中的占位符
             for p in doc.paragraphs:
                 for key, placeholder in placeholders.items():
                     if placeholder in p.text:
@@ -107,22 +98,28 @@ class MyFrame(wx.Frame):
             output_file = os.path.join(self.output_dir, f"{os.path.splitext(json_file)[0]}.docx")
             doc.save(output_file)
         except Exception as e:
-            raise RuntimeError(f"处理文件 {json_file} 时出错: {str(e)}") from e
+            error_msg = f"处理文件 {json_file} 时出错: {str(e)}\n{traceback.format_exc()}"
+            with open("/Users/bigyang/myapp/yiheyuan/log/json2word-errors.log", "a") as log_file:
+                log_file.write(error_msg + "\n")
 
     def UpdateProgress(self, current, total):
-        # 更新进度条
-        self.progress_dialog.Update(current, f"已处理 {current} / {total} 个文件")
+        if current % 5 == 0:  # 每处理 10 个文件更新一次进度条
+            self.progress_dialog.Update(current, f"已处理 {current} / {total} 个文件")
 
     def OnFinish(self):
-        # 关闭进度条对话框
         if self.progress_dialog:
             self.progress_dialog.Destroy()
-
         wx.MessageBox(f"生成结束！共计生成 {len(os.listdir(self.output_dir))} 个文件！", "提示", wx.OK | wx.ICON_INFORMATION)
+
+    def OnClose(self, event):
+        # 关闭时的处理
+        if self.progress_dialog:
+            self.progress_dialog.Destroy()
+        self.Destroy()
 
 class MyApp(wx.App):
     def OnInit(self):
-        frame = MyFrame(None, title="JSON 生成 Word 文档工具", size=(600, 300))
+        frame = MyFrame(None, title="JSON 生成 Word 文档工具", size=(400, 300))
         frame.Show(True)
         self.SetTopWindow(frame)
         return True

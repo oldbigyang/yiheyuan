@@ -13,7 +13,7 @@ import logging
 from datetime import datetime
 
 # Configure logging
-log_dir = '/home/bigyang/python_bigyang/yiheyuan/log/'
+log_dir = '/Users/bigyang/myapp/yiheyuan/log/'
 os.makedirs(log_dir, exist_ok=True)
 log_file = os.path.join(log_dir, f'excel2json_{datetime.now().strftime("%Y%m%d_%H%M%S")}.log')
 logging.basicConfig(filename=log_file, level=logging.ERROR, format='%(asctime)s - %(levelname)s - %(message)s')

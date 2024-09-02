@@ -14,11 +14,11 @@ import traceback
 def process_single_file(json_filename, json_folder):
     try:
         json_path = os.path.join(json_folder, json_filename)
-
+        
         # 读取 JSON 文件
         with open(json_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
-
+        
         # 打开指定的 Word 文档
         doc = Document('/Users/bigyang/myapp/yiheyuan/word/temp.docx')
 
@@ -91,22 +91,11 @@ if __name__ == "__main__":
         format='%(asctime)s - %(levelname)s - %(message)s'
     )
 
-    # 获取用户指定的 JSON 文件夹路径（输入错误时重新输入）
-    while True:
-        try:
-            json_folder = input("请输入 JSON 文件夹路径: ").strip()
-            if not os.path.isdir(json_folder):
-                raise FileNotFoundError("指定的路径不存在或不是一个文件夹。请重新输入。")
-            break
-        except Exception as e:
-            print(f"错误: {e}")
+    # 获取用户指定的 JSON 文件夹路径（仅输入一次）
+    json_folder = input("请输入 JSON 文件夹路径: ")
 
     # 获取所有 JSON 文件列表
     json_files = [f for f in os.listdir(json_folder) if f.endswith('.json')]
-    if not json_files:
-        print("错误: 在指定的文件夹中未找到 JSON 文件。请检查文件夹路径和文件格式。")
-        sys.exit()
-
     total_files = len(json_files)
     batch_size = 100  # 每次处理的文件数量
     generated_files_count = 0
@@ -121,7 +110,7 @@ if __name__ == "__main__":
                     generated_files_count += 1
             except Exception as e:
                 logging.error(f"处理文件时出现异常: {e}\n{traceback.format_exc()}")
-
+            
             # 显示进度和进度条
             print_progress_bar(i + 1, total_files)
 
