@@ -1,133 +1,114 @@
 #!/usr/bin/env python
 # encoding: utf-8
 
-import json
-import logging
 import os
-import sys
+import json
 from datetime import datetime
 from docx import Document
-from concurrent.futures import ProcessPoolExecutor, as_completed
-import gc
-import traceback
+from tqdm import tqdm  # To add a progress bar
+import logging
 
-def process_single_file(json_filename, json_folder):
-    try:
-        json_path = os.path.join(json_folder, json_filename)
+# 设置日志文件路径和名称
+log_folder = "/Users/bigyang/myapp/yiheyuan/log"
+os.makedirs(log_folder, exist_ok=True)
+log_filename = os.path.join(log_folder, f"json2word_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
+logging.basicConfig(filename=log_filename, level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-        # 读取 JSON 文件
-        with open(json_path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
+# 设置模板路径和输出文件夹
+template_path = "/Users/bigyang/myapp/yiheyuan/word/temp.docx"
+output_folder = "/Users/bigyang/myapp/yiheyuan/ok"
+os.makedirs(output_folder, exist_ok=True)
 
-        # 打开指定的 Word 文档
-        doc = Document('/Users/bigyang/myapp/yiheyuan/word/temp.docx')
+# 占位符与JSON字段的映射
+def replace_placeholders(doc, data):
+    mapping = {
+        "year": data.get("年"),
+        "month": data.get("月"),
+        "day": data.get("日"),
+        "zongdengjihao": data.get("总登记号"),
+        "fenleihao": data.get("分类号"),
+        "name": data.get("名称"),
+        "niandai": data.get("年代"),
+        "jianshu": data.get("件数"),
+        "danwei": data.get("单位"),
+        "chicun": data.get("尺寸"),
+        "zhongliang": data.get("重量"),
+        "zhidi": data.get("质地"),
+        "wancanqingkuang": data.get("完残情况"),
+        "laiyuan": data.get("来源"),
+        "ruguanpingzhenghao": data.get("入馆凭证号"),
+        "zhuxiaopingzhenghao": data.get("注销凭证号"),
+        "jibie": data.get("级别"),
+        "beizhu": data.get("备注"),
+        "fuzeren": data.get("负责人"),
+        "danganbianhao": data.get("档案编号"),
+        "xingzhuangneirongmiaoshu": data.get("形状内容描述"),
+        "dangqianbaocuntiaojian": data.get("当前保存条件"),
+        "mingjitiba": data.get("铭记题跋")
 
-        # 定义占位符和 JSON 数据字段的映射
-        placeholder_mapping = {
-            "year": data.get("年"),
-            "month": data.get("月"),
-            "day": data.get("日"),
-            "zongdengjihao": data.get("总登记号"),
-            "fenleihao": data.get("分类号"),
-            "mingcheng": data.get("名称"),
-            "niandai": data.get("年代"),
-            "jianshu": data.get("件数"),
-            "danwei": data.get("单位"),
-            "chicun": data.get("尺寸"),
-            "zhongliang": data.get("重量"),
-            "zhidi": data.get("质地"),
-            "wancanqingkuang": data.get("完残情况"),
-            "laiyuan": data.get("来源"),
-            "ruguanpingzhenghao": data.get("入馆凭证号"),
-            "zhuxiaopingzhenghao": data.get("注销凭证号"),
-            "jibie": data.get("级别"),
-            "beizhu": data.get("备注")
-        }
+    }
 
-        # 替换段落中的占位符
-        for paragraph in doc.paragraphs:
-            for placeholder, value in placeholder_mapping.items():
-                if placeholder in paragraph.text:
-                    paragraph.text = paragraph.text.replace(placeholder, str(value))
+    for paragraph in doc.paragraphs:
+        for key, value in mapping.items():
+            if key in paragraph.text:
+                logging.info(f"Replacing placeholder: {key} with {value}")
+                paragraph.text = paragraph.text.replace(f"{key}", str(value) if value else "")
 
-        # 替换表格中的占位符
-        for table in doc.tables:
-            for row in table.rows:
-                for cell in row.cells:
-                    for paragraph in cell.paragraphs:
-                        for placeholder, value in placeholder_mapping.items():
-                            if placeholder in paragraph.text:
-                                paragraph.text = paragraph.text.replace(placeholder, str(value))
+    for table in doc.tables:
+        for row in table.rows:
+            for cell in row.cells:
+                for key, value in mapping.items():
+                    if key in cell.text:
+                        logging.info(f"Replacing placeholder in table: {key} with {value}")
+                        cell.text = cell.text.replace(f"{key}", str(value) if value else "")
 
-        # 保存修改后的文档到 ok 文件夹中，名称与 json 文件一致
-        output_filename = os.path.join('ok', os.path.splitext(json_filename)[0] + '.docx')
-        doc.save(output_filename)
-        return json_filename
+# 单线程处理每个JSON文件
+def process_single_file(json_filename):
+    logging.info(f"Processing file: {json_filename}")
+    with open(json_filename, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+    
+    # 读取模板文件
+    doc = Document(template_path)
+    
+    # 替换占位符
+    replace_placeholders(doc, data)
+    
+    # 生成 Word 文件
+    output_filename = os.path.join(output_folder, os.path.basename(json_filename).replace(".json", ".docx"))
+    doc.save(output_filename)
+    logging.info(f"Word document saved as: {output_filename}")
 
-    except Exception as e:
-        # 捕获异常并记录到日志中
-        logging.error(f"处理文件 {json_filename} 时出错: {e}\n{traceback.format_exc()}")
-        return None
-
-def print_progress_bar(iteration, total, length=50):
-    percent = f"{100 * (iteration / total):.1f}%"
-    filled_length = int(length * iteration // total)
-    bar = '█' * filled_length + '-' * (length - filled_length)
-    sys.stdout.write(f'\r进度: |{bar}| {iteration}/{total} {percent}')
-    sys.stdout.flush()
-
-if __name__ == "__main__":
-    # 创建 log 和 ok 文件夹
-    os.makedirs('log', exist_ok=True)
-    os.makedirs('ok', exist_ok=True)
-
-    # 获取当前时间，生成日志文件名称
-    log_filename = datetime.now().strftime("log/%Y-%m-%d_%H-%M-%S.log")
-
-    # 配置日志，将日志写入文件
-    logging.basicConfig(
-        filename=log_filename,
-        level=logging.DEBUG,
-        format='%(asctime)s - %(levelname)s - %(message)s'
-    )
-
-    # 获取用户指定的 JSON 文件夹路径（输入错误时重新输入）
-    while True:
-        try:
-            json_folder = input("请输入 JSON 文件夹路径: ").strip()
-            if not os.path.isdir(json_folder):
-                raise FileNotFoundError("指定的路径不存在或不是一个文件夹。请重新输入。")
-            break
-        except Exception as e:
-            print(f"错误: {e}")
-
-    # 获取所有 JSON 文件列表
-    json_files = [f for f in os.listdir(json_folder) if f.endswith('.json')]
+# 主函数
+def main():
+    json_folder = input("请输入 JSON 文件夹路径: ")
+    if not os.path.isdir(json_folder):
+        print("输入的文件夹路径不存在，请重新输入。")
+        logging.error("输入的文件夹路径不存在。")
+        return
+    
+    json_files = [os.path.join(json_folder, f) for f in os.listdir(json_folder) if f.endswith('.json')]
+    
     if not json_files:
-        print("错误: 在指定的文件夹中未找到 JSON 文件。请检查文件夹路径和文件格式。")
-        sys.exit()
+        print("JSON 文件夹中没有找到任何 JSON 文件。")
+        logging.error("未找到 JSON 文件。")
+        return
 
     total_files = len(json_files)
-    batch_size = 100  # 每次处理的文件数量
-    generated_files_count = 0
+    print(f"正在处理 {total_files} 个文件，请稍候...")
+    logging.info(f"开始处理 {total_files} 个 JSON 文件。")
 
-    # 使用进程池进行并行处理
-    with ProcessPoolExecutor(max_workers=4) as executor:  # 可以调整 max_workers 来控制并发进程数
-        futures = [executor.submit(process_single_file, json_filename, json_folder) for json_filename in json_files]
-        for i, future in enumerate(as_completed(futures)):
-            try:
-                result = future.result()
-                if result:
-                    generated_files_count += 1
-            except Exception as e:
-                logging.error(f"处理文件时出现异常: {e}\n{traceback.format_exc()}")
+    # 单线程顺序处理每个文件
+    for i, json_filename in enumerate(tqdm(json_files, desc="处理进度")):
+        try:
+            process_single_file(json_filename)
+        except Exception as e:
+            logging.error(f"处理文件 {json_filename} 时出错: {e}")
+            print(f"处理文件 {json_filename} 时出错: {e}")
+    
+    print(f"程序运行完毕，一共生成 {total_files} 个文件，请查看。")
+    logging.info(f"程序运行完毕，生成 {total_files} 个文件。")
 
-            # 显示进度和进度条
-            print_progress_bar(i + 1, total_files)
+if __name__ == "__main__":
+    main()
 
-            # 定期释放内存
-            if (i + 1) % batch_size == 0:
-                gc.collect()
-
-    # 提示用户程序已完成
-    print(f"\n程序运行完毕，一共生成 {generated_files_count} 个文件，请查看。")

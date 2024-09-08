@@ -11,7 +11,7 @@ from concurrent.futures import ThreadPoolExecutor
 from tqdm import tqdm
 
 # 加载Excel文件
-file_path = '/Users/bigyang/myapp/yiheyuan/excel/source.xls'  # 替换为实际的Excel文件路径
+file_path = '/Users/bigyang/myapp/yiheyuan/excel/source.xlsx'  # 替换为实际的Excel文件路径
 
 # 创建保存JSON文件的目录（如果不存在则创建）
 output_dir = '/Users/bigyang/myapp/yiheyuan/json/'
@@ -42,7 +42,8 @@ async def write_json(file_name, row_dict):
 # 多线程处理函数
 def process_row(index, row):
     try:
-        row_dict = row.to_dict()
+        # 将所有列的值转换为字符串类型
+        row_dict = {col: str(row[col]) for col in row.index}
         file_name = row_dict.get('总登记号', f'row_{index+1}')  # 如果“总登记号”为空，使用行号作为文件名
         file_name = clean_filename(file_name)
         return file_name, row_dict
@@ -52,9 +53,21 @@ def process_row(index, row):
 
 # 主函数：处理Excel数据
 async def main():
+    # 检查文件扩展名，确保支持 .xls 和 .xlsx 文件
+    file_ext = os.path.splitext(file_path)[1].lower()
+
+    if file_ext not in ['.xls', '.xlsx']:
+        print(f"错误：不支持的文件格式 '{file_ext}'。请使用 .xls 或 .xlsx 文件。")
+        return
+
     try:
-        # 读取整个Excel文件
-        data = pd.read_excel(file_path)
+        # 根据文件扩展名选择读取方式
+        if file_ext == '.xls':
+            # 读取 .xls 文件
+            data = pd.read_excel(file_path, engine='xlrd')
+        elif file_ext == '.xlsx':
+            # 读取 .xlsx 文件
+            data = pd.read_excel(file_path, engine='openpyxl')
     except FileNotFoundError:
         print(f"错误：未找到 Excel 文件 '{file_path}'。请检查文件路径是否正确。")
         return
@@ -67,9 +80,9 @@ async def main():
         total_records = len(data)
 
         # 设置批次大小
-        batch_size = 500  # 可根据系统内存进行调整
+        batch_size = 50  # 可根据系统内存进行调整
 
-        with ThreadPoolExecutor(max_workers=8) as executor:  # 根据CPU核心数量调整线程数
+        with ThreadPoolExecutor(max_workers=4) as executor:  # 根据CPU核心数量调整线程数
             loop = asyncio.get_event_loop()
             with tqdm(total=total_records) as pbar:  # 初始化进度条
                 for i in range(0, total_records, batch_size):
@@ -94,3 +107,4 @@ if __name__ == "__main__":
         print(f"数据已成功导出到 '{output_dir}' 目录。")
     except Exception as e:
         print("程序运行时出现错误。请查看上面的错误信息以获取更多细节。")
+
