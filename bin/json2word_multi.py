@@ -6,23 +6,23 @@ import json
 import logging
 from docx import Document
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from tqdm import tqdm
 from datetime import datetime
+from rich.progress import Progress, TextColumn, BarColumn, TimeRemainingColumn
 from multiprocessing import cpu_count
 
 # 日志设置
-log_dir = './log'
+log_dir = '/home/bigyang/python_bigyang/yiheyuan/log'
 if not os.path.exists(log_dir):
     os.makedirs(log_dir)
 log_file = os.path.join(log_dir, f'{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.log')
 logging.basicConfig(filename=log_file, level=logging.INFO, format='%(asctime)s - %(message)s')
 
 # word 模板文件路径
-template_path = "/Users/bigyang/myapp/yiheyuan/word/temp.docx"
+template_path = "/home/bigyang/python_bigyang/yiheyuan/word/temp.docx"
 # JSON 文件夹路径
-json_folder = "/Users/bigyang/myapp/yiheyuan/json"
+json_folder = "/home/bigyang/python_bigyang/yiheyuan/json"
 # 输出文件夹路径
-output_folder = "/Users/bigyang/myapp/yiheyuan/ok"
+output_folder = "/home/bigyang/python_bigyang/yiheyuan/ok"
 if not os.path.exists(output_folder):
     os.makedirs(output_folder)
 
@@ -90,29 +90,45 @@ def process_single_file(json_file):
         return False
 
 # 批量处理函数
-def batch_process_json_files(json_files):
+def batch_process_json_files(json_files, batch_num, total_batches):
     total_files = len(json_files)
     with ProcessPoolExecutor(max_workers=cpu_count()) as executor:
         futures = [executor.submit(process_single_file, json_file) for json_file in json_files]
-        for future in tqdm(as_completed(futures), total=total_files, desc="处理进度"):
-            future.result()  # 阻塞，确保每个任务完成
+        
+        # 使用 rich 进度条显示
+        with Progress(
+            TextColumn("[bold blue]{task.description}"),
+            BarColumn(),
+            "[progress.percentage]{task.percentage:>3.1f}%",
+            TimeRemainingColumn(),
+        ) as progress:
+            task = progress.add_task(f"第 {batch_num}/{total_batches} 批文件处理进度", total=total_files)
 
-# 获取所有 JSON 文件
-def get_json_files(json_folder):
-    return [os.path.join(json_folder, f) for f in os.listdir(json_folder) if f.endswith('.json')]
+            for future in as_completed(futures):
+                future.result()  # 阻塞，确保每个任务完成
+                progress.update(task, advance=1)
+
+# 获取所有 JSON 文件并按文件名排序
+def get_sorted_json_files(json_folder):
+    json_files = [os.path.join(json_folder, f) for f in os.listdir(json_folder) if f.endswith('.json')]
+    return sorted(json_files, key=lambda x: os.path.basename(x))  # 按文件名排序
 
 if __name__ == "__main__":
-    json_files = get_json_files(json_folder)
-
+    json_files = get_sorted_json_files(json_folder)
+    
     if not json_files:
         logging.error("没有找到 JSON 文件")
         print("错误: 没有找到任何 JSON 文件。")
     else:
-        # 分批处理，每批 500 个文件
+        # 计算总批次数量
         batch_size = 500
+        total_batches = (len(json_files) + batch_size - 1) // batch_size  # 总批数,向上取整
+
+        # 分批处理
         for i in range(0, len(json_files), batch_size):
+            batch_num = (i // batch_size) + 1  # 当前批次
             batch = json_files[i:i + batch_size]
-            batch_process_json_files(batch)
+            batch_process_json_files(batch, batch_num, total_batches)
 
         print(f"程序运行完毕，共处理 {len(json_files)} 个文件，请查看生成的 Word 文件。")
 
