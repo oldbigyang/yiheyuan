@@ -1,0 +1,4 @@
+通过 bin/excel2json.py 将 Excel 中的数据导出为独立的 JSON 数据文件
+通过 bin/json2word.py 将 JSON 中的数据读取并插入 word 文件的指定位置
+excel 文件夹中是 Excel 源数据模板
+word 文件夹中是 Word 模板文件
