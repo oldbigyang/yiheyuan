@@ -15,10 +15,10 @@ from rich.console import Console
 console = Console()
 
 # Excel 文件路径（支持 .xls 和 .xlsx 文件）
-file_path = '/home/bigyang/python_bigyang/yiheyuan/excel/source.xlsx'  # 替换为实际的 Excel 文件路径
+file_path = '/home/hongdayang/work/yiheyuan/excel/source.xlsx'  # 替换为实际的 Excel 文件路径
 
 # JSON 文件保存目录（如果不存在则创建）
-output_dir = '/home/bigyang/python_bigyang/yiheyuan/json/'
+output_dir = '/home/hongdayang/work/yiheyuan/json/'
 os.makedirs(output_dir, exist_ok=True)
 
 # 函数：清理文件名中的非法字符和不可见字符
@@ -111,4 +111,3 @@ if __name__ == "__main__":
     # 运行主程序
     asyncio.run(main())
     console.print(f"[green]数据已导出到 {output_dir} 目录。[/green]")
-
